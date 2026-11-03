@@ -5,6 +5,30 @@ import { verifyEmailWorkflow } from './workflows'
 import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { runTemporalWorker } from './worker'
 const prisma = new PrismaClient()
+
+// One Temporal client per process, created lazily on first use.
+let temporalClientPromise: Promise<Client> | undefined
+function getTemporalClient(): Promise<Client> {
+  if (!temporalClientPromise) {
+    temporalClientPromise = Connection.connect({ address: 'localhost:7233' })
+      .then((connection) => new Client({ connection, namespace: 'default' }))
+      .catch((err) => {
+        temporalClientPromise = undefined
+        throw err
+      })
+  }
+  return temporalClientPromise
+}
+
+// Temporal wraps failures (WorkflowFailedError -> ActivityFailure -> TimeoutFailure),
+// so the most useful message is on the innermost cause.
+function rootErrorMessage(err: unknown): string {
+  let current = err
+  while (current instanceof Error && (current as { cause?: unknown }).cause instanceof Error) {
+    current = (current as { cause?: unknown }).cause
+  }
+  return current instanceof Error ? current.message : 'Unknown error'
+}
 const app = express()
 app.use(express.json())
 
@@ -273,38 +297,45 @@ app.post('/leads/verify-emails', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'No leads found with the provided IDs' })
     }
 
-    const connection = await Connection.connect({ address: 'localhost:7233' })
-    const client = new Client({ connection, namespace: 'default' })
+    const client = await getTemporalClient()
 
-    let verifiedCount = 0
-    const results: Array<{ leadId: number; emailVerified: boolean }> = []
-    const errors: Array<{ leadId: number; leadName: string; error: string }> = []
-
-    for (const lead of leads) {
-      try {
-        const isVerified = await client.workflow.execute(verifyEmailWorkflow, {
+    // Start every workflow up front and await them together, so one slow or
+    // failing lead does not block the others.
+    const outcomes = await Promise.allSettled(
+      leads.map(async (lead) => {
+        const handle = await client.workflow.start(verifyEmailWorkflow, {
           taskQueue: 'myQueue',
           workflowId: `verify-email-${lead.id}-${Date.now()}`,
           args: [lead.email],
         })
+        const isVerified = Boolean(await handle.result())
 
         await prisma.lead.update({
           where: { id: lead.id },
-          data: { emailVerified: Boolean(isVerified) },
+          data: { emailVerified: isVerified },
         })
 
-        results.push({ leadId: lead.id, emailVerified: isVerified })
-        verifiedCount += 1
-      } catch (error) {
+        return isVerified
+      })
+    )
+
+    const results: Array<{ leadId: number; emailVerified: boolean }> = []
+    const errors: Array<{ leadId: number; leadName: string; error: string }> = []
+
+    outcomes.forEach((outcome, i) => {
+      const lead = leads[i]
+      if (outcome.status === 'fulfilled') {
+        results.push({ leadId: lead.id, emailVerified: outcome.value })
+      } else {
         errors.push({
           leadId: lead.id,
           leadName: `${lead.firstName} ${lead.lastName}`.trim(),
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: rootErrorMessage(outcome.reason),
         })
       }
-    }
+    })
 
-    await connection.close()
+    const verifiedCount = results.length
 
     res.json({ success: true, verifiedCount, results, errors })
   } catch (error) {

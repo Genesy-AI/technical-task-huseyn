@@ -37,18 +37,35 @@ export const LeadsList: FC = () => {
 
   const verifyEmailsMutation = useMutation({
     mutationFn: async (ids: number[]) => api.leads.verifyEmails({ leadIds: ids }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['leads', 'getMany'] })
+    onMutate: (ids) => {
       setIsEnrichDropdownOpen(false)
-      toast.success(
-        data.verifiedCount === 1
-          ? `Verified ${data.verifiedCount} email`
-          : `Verified ${data.verifiedCount} emails`
+      const toastId = toast.loading(
+        ids.length === 1 ? 'Verifying 1 email...' : `Verifying ${ids.length} emails...`
+      )
+      return { toastId }
+    },
+    onSuccess: (data, _ids, context) => {
+      queryClient.invalidateQueries({ queryKey: ['leads', 'getMany'] })
+      const toastId = context?.toastId
+      const verifiedLabel = data.verifiedCount === 1 ? '1 email' : `${data.verifiedCount} emails`
+
+      if (data.errors.length === 0) {
+        toast.success(`Verified ${verifiedLabel}`, { id: toastId })
+        return
+      }
+
+      const failedNames = data.errors.map((e) => e.leadName || `Lead #${e.leadId}`).join(', ')
+      const failedLabel = data.errors.length === 1 ? '1 email' : `${data.errors.length} emails`
+      toast.error(
+        data.verifiedCount > 0
+          ? `Verified ${verifiedLabel}. Could not verify ${failedLabel}: ${failedNames}`
+          : `Could not verify ${failedLabel}: ${failedNames}`,
+        { id: toastId, duration: 8000 }
       )
     },
-    onError: () => {
-      toast.error('Failed to verify emails. Please try again.')
-    }
+    onError: (_err, _ids, context) => {
+      toast.error('Failed to verify emails. Please try again.', { id: context?.toastId })
+    },
   })
 
   const handleSelectAll = (checked: boolean) => {
@@ -149,13 +166,14 @@ export const LeadsList: FC = () => {
                     </button>
                     <button
                       onClick={() => verifyEmailsMutation.mutate(selectedLeads)}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      disabled={verifyEmailsMutation.isPending}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <div className="flex items-center">
                         <svg className="mr-3 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12H8m8 0a8 8 0 11-16 0 8 8 0 0116 0zm-8 0V4" />
                         </svg>
-                        Verify Email
+                        {verifyEmailsMutation.isPending ? 'Verifying...' : 'Verify Email'}
                       </div>
                     </button>
                     <button
