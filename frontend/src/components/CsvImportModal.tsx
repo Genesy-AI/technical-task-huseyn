@@ -100,6 +100,9 @@ export const CsvImportModal: FC<CsvImportModalProps> = ({ isOpen, onClose }) => 
         jobTitle: lead.jobTitle || undefined,
         countryCode: lead.countryCode || undefined,
         companyName: lead.companyName || undefined,
+        yearsInRole: lead.yearsInRole,
+        phoneNumber: lead.phoneNumber || undefined,
+        linkedIn: lead.linkedIn || undefined,
       }))
 
       return api.leads.bulkImport({ leads: leadsToImport })
@@ -238,7 +241,7 @@ export const CsvImportModal: FC<CsvImportModalProps> = ({ isOpen, onClose }) => 
                   </p>
                   <p className="text-sm text-gray-500">
                     CSV must include: firstName, lastName, email (required). Optional: jobTitle, countryCode,
-                    companyName
+                    companyName, yearsInRole, phoneNumber, linkedIn
                   </p>
                 </div>
               )}
@@ -285,16 +288,25 @@ export const CsvImportModal: FC<CsvImportModalProps> = ({ isOpen, onClose }) => 
                         Company
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Errors
+                        Issues
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {csvData.map((lead, index) => (
-                      <tr key={index} className={lead.isValid ? 'bg-white' : 'bg-red-50'}>
+                      <tr
+                        key={index}
+                        className={
+                          !lead.isValid ? 'bg-red-50' : lead.warnings.length > 0 ? 'bg-yellow-50' : 'bg-white'
+                        }
+                      >
                         <td className="px-3 py-2 text-sm text-gray-900">{lead.rowIndex - 1}</td>
                         <td className="px-3 py-2">
-                          {lead.isValid ? (
+                          {lead.isValid && lead.warnings.length > 0 ? (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">
+                              Warning
+                            </span>
+                          ) : lead.isValid ? (
                             <span className="inline-flex px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
                               Valid
                             </span>
@@ -309,7 +321,15 @@ export const CsvImportModal: FC<CsvImportModalProps> = ({ isOpen, onClose }) => 
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-900">{lead.email || '-'}</td>
                         <td className="px-3 py-2 text-sm text-gray-900">{lead.companyName || '-'}</td>
-                        <td className="px-3 py-2 text-sm text-red-600">{lead.errors.join(', ') || '-'}</td>
+                        <td className="px-3 py-2 text-sm">
+                          {lead.errors.length === 0 && lead.warnings.length === 0 && '-'}
+                          {lead.errors.length > 0 && (
+                            <div className="text-red-600">{lead.errors.join(', ')}</div>
+                          )}
+                          {lead.warnings.length > 0 && (
+                            <div className="text-yellow-700">{lead.warnings.join(', ')}</div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

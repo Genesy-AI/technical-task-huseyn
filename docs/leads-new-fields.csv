@@ -1,0 +1,12 @@
+firstName,lastName,email,jobTitle,countryCode,companyName,yearsInRole,phoneNumber,linkedIn
+Elara,Quintana,elara.quintana@example.com,Product Manager,US,Northwind Labs,3,+1-415-555-0182,https://www.linkedin.com/in/elara-quintana
+Tobias,Wren,tobias.wren@example.com,Data Engineer,GB,Brightline Analytics,0,+44 20 7946 0958,linkedin.com/in/tobiaswren
+Saanvi,Okafor,saanvi.okafor@example.com,Head of Sales,IN,Lotus Ventures,7,(212)555-0147x204,https://lnkd.in/eB4kQz9
+Mateus,Lindqvist,mateus.lindqvist@example.com,CTO,SE,Fjord Systems,12,+46 8 123 456 78,http://se.linkedin.com/in/mateus-lindqvist/
+Priya,Delacroix,priya.delacroix@example.com,Marketing Lead,FR,Maison Digitale,1,001-650-555-0199,www.linkedin.com/company/maison-digitale
+Kenji,Abernathy,kenji.abernathy@example.com,UX Designer,JP,Sakura Studio,4,,
+Ingrid,Mwangi,ingrid.mwangi@example.com,Operations Director,KE,Savanna Logistics,,+254 712 345678,https://www.linkedin.com/in/ingrid-mwangi?trk=public_profile
+Rafael,Ostrowski,rafael.ostrowski@example.com,Account Executive,PL,Vistula Tech,2.5,+48 22 555 01 23,https://www.linkedin.com/in/rafael-ostrowski
+Noor,Halvorsen,noor.halvorsen@example.com,Software Engineer,NO,Aurora Cloud,6,call me maybe,https://www.linkedin.com/in/noor-halvorsen
+Dmitri,Castellano,dmitri.castellano@example.com,Recruiter,ES,Iberia Talent,5,+34 91 555 0134,https://example.com/in/dmitri-castellano
+Amara,Whitfield,amara.whitfield@example.com,Customer Success Manager,AU,Coral Reef Software,150,+61 2 5550 1234,https://www.linkedin.com/in/amara-whitfield
