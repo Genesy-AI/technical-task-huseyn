@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import { isValidPhoneNumber, normalizeLinkedInUrl, parseYearsInRole } from './leadFieldValidators'
 
 export interface CsvLead {
   firstName: string
@@ -7,8 +8,13 @@ export interface CsvLead {
   jobTitle?: string
   countryCode?: string
   companyName?: string
+  yearsInRole?: number
+  phoneNumber?: string
+  linkedIn?: string
   isValid: boolean
   errors: string[]
+  /** Non-blocking issues with optional fields; the invalid value is dropped and the row stays importable. */
+  warnings: string[]
   rowIndex: number
 }
 
@@ -49,6 +55,8 @@ export const parseCsv = (content: string): CsvLead[] => {
     if (Object.values(row).every((value) => !value)) return
 
     const lead: Partial<CsvLead> = { rowIndex: index + 2 }
+    const errors: string[] = []
+    const warnings: string[] = []
 
     Object.entries(row).forEach(([header, value]) => {
       const normalizedHeader = header.toLowerCase().replace(/[^a-z]/g, '')
@@ -73,10 +81,32 @@ export const parseCsv = (content: string): CsvLead[] => {
         case 'companyname':
           lead.companyName = trimmedValue || undefined
           break
+        case 'yearsinrole':
+          if (trimmedValue) {
+            const years = parseYearsInRole(trimmedValue)
+            if (years === null)
+              warnings.push(
+                `Invalid years in role "${trimmedValue}" (must be a whole number 0–100), it will be imported empty`
+              )
+            else lead.yearsInRole = years
+          }
+          break
+        case 'phonenumber':
+          if (trimmedValue) {
+            if (isValidPhoneNumber(trimmedValue)) lead.phoneNumber = trimmedValue
+            else warnings.push(`Invalid phone number "${trimmedValue}", it will be imported empty`)
+          }
+          break
+        case 'linkedin':
+          if (trimmedValue) {
+            const linkedIn = normalizeLinkedInUrl(trimmedValue)
+            if (linkedIn) lead.linkedIn = linkedIn
+            else warnings.push(`Invalid LinkedIn URL "${trimmedValue}", it will be imported empty`)
+          }
+          break
       }
     })
 
-    const errors: string[] = []
     if (!lead.firstName?.trim()) {
       errors.push('First name is required')
     }
@@ -96,6 +126,7 @@ export const parseCsv = (content: string): CsvLead[] => {
       email: lead.email || '',
       isValid: errors.length === 0,
       errors,
+      warnings,
     } as CsvLead)
   })
 

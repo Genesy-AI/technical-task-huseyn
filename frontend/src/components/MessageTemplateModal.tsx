@@ -1,6 +1,6 @@
-import { FC, useState, useEffect, useCallback, useRef } from 'react'
+import { FC, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { api } from '../api'
 
@@ -18,6 +18,7 @@ export const MessageTemplateModal: FC<MessageTemplateModalProps> = ({
   selectedLeadsCount,
 }) => {
   const [template, setTemplate] = useState('')
+  const [fieldSearch, setFieldSearch] = useState('')
   const [generationResult, setGenerationResult] = useState<{
     success: boolean
     generatedCount: number
@@ -40,6 +41,7 @@ export const MessageTemplateModal: FC<MessageTemplateModalProps> = ({
         toast.success(message)
         onClose()
         setTemplate('')
+        setFieldSearch('')
         setGenerationResult(null)
       } else {
         const successMessage =
@@ -74,6 +76,7 @@ export const MessageTemplateModal: FC<MessageTemplateModalProps> = ({
     if (!generateMessagesMutation.isPending) {
       onClose()
       setTemplate('')
+      setFieldSearch('')
       setGenerationResult(null)
     }
   }, [generateMessagesMutation.isPending, onClose])
@@ -106,7 +109,18 @@ export const MessageTemplateModal: FC<MessageTemplateModalProps> = ({
     }
   }, [isOpen, handleClose])
 
-  const availableFields = ['firstName', 'lastName', 'email', 'jobTitle', 'companyName', 'countryCode']
+  const templateFields = useQuery({
+    queryKey: ['leads', 'templateFields'],
+    queryFn: () => api.leads.templateFields(),
+    enabled: isOpen,
+    staleTime: Infinity,
+  })
+
+  const filteredFields = useMemo(() => {
+    const query = fieldSearch.trim().toLowerCase()
+    const fields = templateFields.data ?? []
+    return query ? fields.filter((field) => field.toLowerCase().includes(query)) : fields
+  }, [templateFields.data, fieldSearch])
 
   const insertField = (field: string) => {
     if (textareaRef.current) {
@@ -156,18 +170,53 @@ export const MessageTemplateModal: FC<MessageTemplateModalProps> = ({
                 Message Template
               </label>
               <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-sm text-gray-600">Insert field:</span>
-                  {availableFields.map((field) => (
-                    <button
-                      key={field}
-                      type="button"
-                      onClick={() => insertField(field)}
-                      className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-                    >
-                      {`{${field}}`}
-                    </button>
-                  ))}
+                <div className="border border-gray-200 rounded-md">
+                  <div className="flex items-center gap-2 p-2 border-b border-gray-200">
+                    <span className="text-sm text-gray-600 whitespace-nowrap">Insert field:</span>
+                    <input
+                      type="search"
+                      value={fieldSearch}
+                      onChange={(e) => setFieldSearch(e.target.value)}
+                      placeholder="Search fields..."
+                      aria-label="Search template fields"
+                      disabled={!templateFields.isSuccess}
+                      className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+                    />
+                  </div>
+                  <div className="max-h-28 overflow-y-auto p-2">
+                    {templateFields.isPending ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-500" role="status">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        Loading fields...
+                      </div>
+                    ) : templateFields.isError ? (
+                      <div className="flex items-center gap-2 text-sm text-red-600">
+                        Failed to load fields.
+                        <button
+                          type="button"
+                          onClick={() => templateFields.refetch()}
+                          className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : filteredFields.length === 0 ? (
+                      <p className="text-sm text-gray-500">No fields match "{fieldSearch}"</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {filteredFields.map((field) => (
+                          <button
+                            key={field}
+                            type="button"
+                            onClick={() => insertField(field)}
+                            className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                          >
+                            {`{${field}}`}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <textarea
                   ref={textareaRef}

@@ -2,7 +2,8 @@ import { PrismaClient } from '@prisma/client'
 import express, { Request, Response } from 'express'
 import { Connection, Client } from '@temporalio/client'
 import { verifyEmailWorkflow } from './workflows'
-import { generateMessageFromTemplate } from './utils/messageGenerator'
+import { generateMessageFromTemplate, TEMPLATE_FIELDS } from './utils/messageGenerator'
+import { isValidPhoneNumber, normalizeLinkedInUrl, parseYearsInRole } from './utils/leadFieldValidators'
 import { runTemporalWorker } from './worker'
 const prisma = new PrismaClient()
 const app = express()
@@ -36,6 +37,10 @@ app.post('/leads', async (req: Request, res: Response) => {
     },
   })
   res.json(lead)
+})
+
+app.get('/leads/template-fields', (_req: Request, res: Response) => {
+  res.json(TEMPLATE_FIELDS)
 })
 
 app.get('/leads/:id', async (req: Request, res: Response) => {
@@ -229,6 +234,12 @@ app.post('/leads/bulk', async (req: Request, res: Response) => {
             jobTitle: lead.jobTitle ? lead.jobTitle.trim() : null,
             countryCode: lead.countryCode ? lead.countryCode.trim() : null,
             companyName: lead.companyName ? lead.companyName.trim() : null,
+            yearsInRole: parseYearsInRole(lead.yearsInRole),
+            phoneNumber:
+              typeof lead.phoneNumber === 'string' && isValidPhoneNumber(lead.phoneNumber.trim())
+                ? lead.phoneNumber.trim()
+                : null,
+            linkedIn: typeof lead.linkedIn === 'string' ? normalizeLinkedInUrl(lead.linkedIn) : null,
           },
         })
         importedCount++

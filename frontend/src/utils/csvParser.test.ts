@@ -66,6 +66,7 @@ John,Doe,john.doe@example.com,Developer,US,Tech Corp`
       companyName: 'Tech Corp',
       isValid: true,
       errors: [],
+      warnings: [],
       rowIndex: 2,
     })
   })
@@ -222,5 +223,58 @@ Jane,Johnson,jane@example.com`
     expect(result[0].lastName).toBe('Doe')
     expect(result[0].email).toBe('john@example.com')
     expect(result[0].isValid).toBe(true)
+  })
+
+  it('should parse yearsInRole, phoneNumber and linkedIn', () => {
+    const csv = `firstName,lastName,email,yearsInRole,phoneNumber,linkedIn
+John,Doe,john@example.com,0,+1-280-754-0462x2154,linkedin.com/in/johndoe`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].isValid).toBe(true)
+    expect(result[0].yearsInRole).toBe(0)
+    expect(result[0].phoneNumber).toBe('+1-280-754-0462x2154')
+    expect(result[0].linkedIn).toBe('https://linkedin.com/in/johndoe')
+  })
+
+  it('should leave new optional fields undefined when empty', () => {
+    const csv = `firstName,lastName,email,yearsInRole,phoneNumber,linkedIn
+John,Doe,john@example.com,,,`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].isValid).toBe(true)
+    expect(result[0].yearsInRole).toBeUndefined()
+    expect(result[0].phoneNumber).toBeUndefined()
+    expect(result[0].linkedIn).toBeUndefined()
+  })
+
+  it('should warn (not reject) on invalid optional new fields and drop the values', () => {
+    const csv = `firstName,lastName,email,yearsInRole,phoneNumber,linkedIn
+John,Doe,john@example.com,2.5,call me,https://example.com/in/john`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].isValid).toBe(true)
+    expect(result[0].errors).toEqual([])
+    expect(result[0].yearsInRole).toBeUndefined()
+    expect(result[0].phoneNumber).toBeUndefined()
+    expect(result[0].linkedIn).toBeUndefined()
+    expect(result[0].warnings).toEqual([
+      'Invalid years in role "2.5" (must be a whole number 0–100), it will be imported empty',
+      'Invalid phone number "call me", it will be imported empty',
+      'Invalid LinkedIn URL "https://example.com/in/john", it will be imported empty',
+    ])
+  })
+
+  it('should still reject rows with required-field errors even when they also have warnings', () => {
+    const csv = `firstName,lastName,email,phoneNumber
+John,,john@example.com,call me`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].isValid).toBe(false)
+    expect(result[0].errors).toEqual(['Last name is required'])
+    expect(result[0].warnings).toHaveLength(1)
   })
 })
